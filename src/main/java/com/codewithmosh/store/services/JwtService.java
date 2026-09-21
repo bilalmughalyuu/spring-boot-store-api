@@ -1,47 +1,85 @@
 package com.codewithmosh.store.services;
 
+import com.codewithmosh.store.config.JwtConfig;
+import com.codewithmosh.store.entities.Role;
+import com.codewithmosh.store.entities.User;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.Date;
 
+@AllArgsConstructor
 @Service
 public class JwtService {
-    @Value("${spring.jwt.secret}")
-    private String secret;
-    public String generateToken(String email) {
-        final long tokenExpiration = 86400; // 1 day
+    private final JwtConfig jwtConfig;
 
-        return Jwts.builder()
-                .subject(email)
-                .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + 1000 * tokenExpiration))
-                .signWith(Keys.hmacShaKeyFor(secret.getBytes()))
-                .compact();
+    public Jwt generateAccessToken(User user) {
+        return generateToken(user, Long.parseLong(jwtConfig.getAccessTokenExpiration()));
     }
 
-    public boolean validateToken(String token) {
+    public Jwt generateRefreshToken(User user) {
+        return generateToken(user, Long.parseLong(jwtConfig.getRefreshTokenExpiration()));
+    }
+
+    private Jwt generateToken(User user, long tokenExpiration) {
+        var claims = Jwts.claims()
+                .subject(user.getId().toString())
+                .add("email", user.getEmail())
+                .add("name", user.getName())
+                .add("role", user.getRole())
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + 1000 * tokenExpiration))
+                .build();
+
+        return new Jwt(claims, jwtConfig.getSecretKey());
+
+//        return Jwts.builder()
+//                .subject(user.getId().toString())
+//                .claim("email", user.getEmail())
+//                .claim("name", user.getName())
+//                .claim("role", user.getRole())
+//                .issuedAt(new Date())
+//                .expiration(new Date(System.currentTimeMillis() + 1000 * tokenExpiration))
+//                .signWith(jwtConfig.getSecretKey())
+//                .compact();
+    }
+
+    public Jwt parseToken(String token) {
         try {
             var claims = getClaims(token);
-            return  claims.getExpiration().after(new Date());
-        } catch (JwtException ex) {
-            return false;
+            return new Jwt(claims, jwtConfig.getSecretKey());
+        } catch (JwtException e){
+            return null;
         }
     }
 
+//    public boolean validateToken(String token) {
+//        try {
+//            var claims = getClaims(token);
+//            return  claims.getExpiration().after(new Date());
+//        } catch (JwtException ex) {
+//            return false;
+//        }
+//    }
+
     private Claims getClaims(String token) {
         return Jwts.parser()
-                .verifyWith(Keys.hmacShaKeyFor(secret.getBytes()))
+                .verifyWith(jwtConfig.getSecretKey())
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
     }
 
-    public String getEmailFromToken(String token) {
-        return getClaims(token).getSubject();
-    }
+//    public Long getUserIdFromToken(String token) {
+//        return Long.valueOf(getClaims(token).getSubject());
+//    }
+
+//    public Role getRoleFromToken(String token) {
+//        return Role.valueOf(getClaims(token).get("role", String.class));
+//    }
 }
