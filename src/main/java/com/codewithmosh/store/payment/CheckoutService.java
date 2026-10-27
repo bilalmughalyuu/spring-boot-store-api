@@ -101,7 +101,7 @@ public class CheckoutService {
                         .setMode(SessionCreateParams.Mode.PAYMENT)
                         .setSuccessUrl(websiteUrl + "/checkout-success?orderId=" + order.getId())
                         .setCancelUrl(websiteUrl + "/checkout-cancel")
-                        .putMetadata("order_id", order.getId().toString());
+                        .setPaymentIntentData(createPaymentIntent(order));
 
                 order.getItems().forEach(item -> {
                     var lineItem = createLineItem(item);
@@ -137,6 +137,12 @@ public class CheckoutService {
             } catch (SignatureVerificationException e) {
                 throw new PaymentException("Invalid Signature");
             }
+        }
+
+        private static SessionCreateParams.PaymentIntentData createPaymentIntent(Order order) {
+            return SessionCreateParams.PaymentIntentData.builder()
+                    .putMetadata("order_id", order.getId().toString())
+                    .build();
         }
 
         private Long extractOrderId(Event event) {
